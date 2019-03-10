@@ -3,8 +3,8 @@ using System.IO;
 using Tesseract;
 using iTextSharp.text.pdf;
 using iTextSharp.text.pdf.parser;
-using System.Threading;
 using System.Drawing;
+using System.Collections.Generic;
 
 namespace OcrLib
 {
@@ -40,6 +40,7 @@ namespace OcrLib
                             pdf.BeginDocument(file);
                             for (int i = 1; i <= pdfReader.NumberOfPages; i++)
                             {
+                                extractor.Rotation = pdfReader.GetPageRotation(i);
                                 parser.ProcessContent(i, extractor);
                                 var tempFile = extractor.TempFile;
                                 containsText |= extractor.ContainsText;
@@ -88,8 +89,8 @@ namespace OcrLib
         private readonly string _destination;
 
         public string TempFile { get; private set; }
-        public Image TempImage { get; set; }
         public bool ContainsText { get;  private set; }
+        public int Rotation { get; internal set; }
 
         public ImageExtractor(string destination)
         {
@@ -107,17 +108,27 @@ namespace OcrLib
         public void RenderImage(ImageRenderInfo ri)
         {
             var imageObject = ri.GetImage();
-            var data = imageObject.GetImageAsBytes();
-            TempImage = imageObject.GetDrawingImage();
+            var img = imageObject.GetDrawingImage();
+            img.RotateFlip(_Rotation[this.Rotation]);
+
             var fileType = imageObject.GetFileType();
             TempFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"temp.{fileType}");
-            File.WriteAllBytes(TempFile, data);
+            img.Save(TempFile);
         }
 
         public void RenderText(TextRenderInfo renderInfo)
         {
             ContainsText = renderInfo.GetText().Length > 0;
         }
+
+        static private Dictionary<int, RotateFlipType> _Rotation = new Dictionary<int, RotateFlipType>
+        {
+            {   0, RotateFlipType.RotateNoneFlipNone },
+            {  90, RotateFlipType.Rotate270FlipNone },
+            { 180, RotateFlipType.Rotate180FlipNone },
+            { 270, RotateFlipType.Rotate90FlipNone },
+            { -90, RotateFlipType.Rotate90FlipNone }
+        };
     }
 
 }
